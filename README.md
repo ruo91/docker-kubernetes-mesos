@@ -27,6 +27,7 @@ root@ruo91:~# git clone https://github.com/ruo91/docker-kubernetes-mesos /opt/do
 #### - Build
 ------------
 K8SM은 아직까지 분산 환경에서 동작을 하지 않기 때문에, 올인원 모드로 빌드해서 구성 하셔야 합니다.
+
 동작 하지않는 이유는 로컬머신에서는 K8SM의 scheduler가 mesos master로 스케줄러를 등록이 가능하지만, 분산 환경에서는 아직 구현이 안되어있기 때문입니다.
 
 추후 mesosphere 팀에서 이 기능이 구현이 되면, README.md 파일을 분산 환경으로 다시 수정하도록 하겠습니다.
@@ -37,9 +38,9 @@ root@ruo91:~# docker build --rm -t k8sm:all -f k8sm-all-in-one .
 #### - Run
 ------------
 K8SM framework의 컨테이너를 실행 합니다.
+```
 root@ruo91:~# docker run -d --name="k8sm" -h "k8sm" --privileged=true -v /dev:/dev k8sm:all
-
-K8SM framework에서는 kubernetes의 minion에서 실행하였던 kube-proxy, kubelet(executor)은 scheduler를 통해 mesos가 이를 실행 하므로 따로 설정 및 실행을 하지 않아도 됩니다.
+```
 
 실행 순서는 다음과 같습니다.
 
@@ -96,9 +97,9 @@ root@k8sm:~# kubectl get pods
 POD           IP         CONTAINER(S)   IMAGE(S)      HOST                LABELS               STATUS    CREATED
 nginx-7izkd   10.0.0.1   nginx          ruo91/nginx   k8sm/172.17.1.177   name=nginx-cluster   Running   52 minutes
 nginx-c7ies   10.0.0.5   nginx          ruo91/nginx   k8sm/172.17.1.177   name=nginx-cluster   Running   52 minutes
-nginx-djc1q   10.0.0.9           nginx          ruo91/nginx   <unassigned>        name=nginx-cluster   Pending   52 minutes
+nginx-djc1q   10.0.0.9   nginx          ruo91/nginx   k8sm/172.17.1.177   name=nginx-cluster   Running   52 minutes
 nginx-j9qji   10.0.0.4   nginx          ruo91/nginx   k8sm/172.17.1.177   name=nginx-cluster   Running   52 minutes
-nginx-mtlqn   10.0.0.10          nginx          ruo91/nginx   <unassigned>        name=nginx-cluster   Pending   52 minutes
+nginx-mtlqn   10.0.0.10   nginx          ruo91/nginx   k8sm/172.17.1.177   name=nginx-cluster   Running   52 minutes
 nginx-o9la3   10.0.0.6   nginx          ruo91/nginx   k8sm/172.17.1.177   name=nginx-cluster   Running   52 minutes
 nginx-qb27h   10.0.0.2   nginx          ruo91/nginx   k8sm/172.17.1.177   name=nginx-cluster   Running   52 minutes
 nginx-tmvvm   10.0.0.3   nginx          ruo91/nginx   k8sm/172.17.1.177   name=nginx-cluster   Running   52 minutes
