@@ -142,7 +142,7 @@ RUN chmod a+x $SRC_DIR/*.sh
 
 # Supervisor
 RUN mkdir -p /var/log/supervisor
-ADD conf/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+ADD conf/minion_supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # SSH
 RUN mkdir /var/run/sshd
