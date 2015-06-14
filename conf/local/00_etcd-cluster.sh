@@ -10,6 +10,6 @@ LOCAL_IP="`ifconfig eth0 | grep 'inet addr:' | cut -d: -f2 | awk '{ print $1 }'`
 # Solutions: --listen-client-urls http://0.0.0.0:4001
 etcd \
 --data-dir "/tmp/etcd" \
---listen-client-urls "http://$CLUSTER_IP:4001" \
---advertise-client-urls "http://$CLUSTER_IP:4001" \
+--listen-client-urls "http://$LOCAL_IP:4001" \
+--advertise-client-urls "http://$LOCAL_IP:4001" \
 > /tmp/etcd-cluster.log 2>&1 &
