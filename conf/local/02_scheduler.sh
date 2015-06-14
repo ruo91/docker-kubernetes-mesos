@@ -3,7 +3,7 @@ K8SM=/opt/k8sm
 PATH=$PATH:$K8SM
 
 ETCD_SERVER="http://127.0.0.1:4001"
-ZK_SERVER="127.0.0.1:5050"
+ZK_SERVER="zk://127.0.0.1:2181"
 
 MESOS_USER="root"
 FRAMEWORK_NAME="kubernetes-mesos"
