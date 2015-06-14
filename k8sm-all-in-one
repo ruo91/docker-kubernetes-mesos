@@ -137,7 +137,7 @@ RUN git clone https://github.com/mesosphere/kubernetes-mesos.git k8sm-source \
  && echo 'export PATH=$PATH:$K8SM' >> /etc/profile \
  && echo '' >> /etc/profile
 
-ADD conf/scripts/04_mesos-clould.conf	$SRC_DIR/mesos-clould.conf
+ADD conf/local/04_mesos-clould.conf	$SRC_DIR/mesos-clould.conf
 RUN chmod a+x $SRC_DIR/*.sh
 
 # Supervisor
