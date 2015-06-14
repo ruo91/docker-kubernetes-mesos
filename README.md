@@ -49,7 +49,7 @@ zookeeper -> mesos-slave -> mesos-master -> etcd -> apiserver -> scheduler -> co
 root@ruo91:~# ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' k8sm` \
 "service zookeeper start \
 && sleep 1 && /etc/mesos/mesos-slave.sh \
-&& sleep 1 && /etc/mesos/mesos-master \
+&& sleep 1 && /etc/mesos/mesos-master.sh \
 && sleep 1 && /opt/etcd-cluster.sh \
 && sleep 2 && /opt/api-server.sh \
 && sleep 2 && /opt/scheduler.sh \
