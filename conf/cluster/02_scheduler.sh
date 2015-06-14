@@ -4,9 +4,7 @@ PATH=$PATH:$K8SM
 
 ETCD_SERVER="http://etcd-0:4001,http://etcd-1:4001,http://etcd-2:4001"
 ZK_SERVER="zk://mesos-master-0:2181,mesos-master-1:2181,mesos-master-2:2181/mesos"
-
 MESOS_USER="root"
-FRAMEWORK_NAME="kubernetes-mesos"
 
 km scheduler \
 --v=2 \
@@ -15,5 +13,4 @@ km scheduler \
 --mesos_user=$MESOS_USER \
 --mesos_master=$ZK_SERVER \
 --etcd_servers=$ETCD_SERVER \
---framework_name=$FRAMEWORK_NAME \
 > /tmp/scheduler.log 2>&1 &
