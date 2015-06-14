@@ -94,7 +94,7 @@ RUN echo "#!/bin/bash" >> $MESOS_SCRIPT \
  && echo "--cluster=$CLUSTER_NAME \\" >>  $MESOS_SCRIPT \
  && echo "--quorum=$ZK_QUORUM_NUM \\" >>  $MESOS_SCRIPT \
  && echo "--work_dir=$MESOS_WORK_DIR \\" >>  $MESOS_SCRIPT \
- && echo "--zk=zk://$ZK_SERVER:$ZK_PORT/$ZK_ZNODE_PATH" >> $MESOS_SCRIPT \
+ && echo "--zk=zk://$ZK_SERVER:$ZK_PORT/$ZK_ZNODE_PATH \\" >> $MESOS_SCRIPT \
  && echo "> /tmp/etcd-cluster.log 2>&1 &" >> $MESOS_SCRIPT \
  && chmod a+x $MESOS_SCRIPT
 
@@ -122,7 +122,7 @@ ENV MESOS_SLAVE_SCRIPT /etc/mesos/mesos-slave.sh
 RUN echo "#!/bin/bash" > $MESOS_SLAVE_SCRIPT \
  && echo "mesos-slave \\" >> $MESOS_SLAVE_SCRIPT \
  && echo "--containerizers=$CONTAINERIZERS \\" >> $MESOS_SLAVE_SCRIPT \
- && echo "--master=zk://$ZK_SERVER:$ZK_PORT/$ZK_ZNODE_PATH" >> $MESOS_SLAVE_SCRIPT \
+ && echo "--master=zk://$ZK_SERVER:$ZK_PORT/$ZK_ZNODE_PATH \\" >> $MESOS_SLAVE_SCRIPT \
  && echo "> /tmp/mesos-slave.log 2>&1 &" >> $MESOS_SLAVE_SCRIPT \
  && chmod a+x $MESOS_SLAVE_SCRIPT
 
