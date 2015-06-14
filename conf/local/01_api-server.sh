@@ -8,7 +8,7 @@ PORTAL_NET="`ip a s docker0 | grep 'inet' | awk '{ print $2 }'`"
 km apiserver \
 --v=2 \
 --port=8080 \
---address=127.0.0.1 \
+--address=0.0.0.0 \
 --portal_net=$PORTAL_NET \
 --etcd_servers=$ETCD_SERVER \
 --cloud_provider=mesos \
