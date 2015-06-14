@@ -56,7 +56,7 @@ RUN echo "#!/bin/bash" >> $MESOS_SCRIPT \
  && echo "--quorum=$ZK_QUORUM_NUM \\" >>  $MESOS_SCRIPT \
  && echo "--work_dir=$MESOS_WORK_DIR \\" >>  $MESOS_SCRIPT \
  && echo "--zk=zk://$ZK_SERVER_1:$ZK_PORT,$ZK_SERVER_2:$ZK_PORT,$ZK_SERVER_3:$ZK_PORT/$ZK_ZNODE_PATH \\" >> $MESOS_SCRIPT \
- && echo "> /tmp/etcd-cluster.log 2>&1 &" >> $MESOS_SCRIPT \
+ && echo "> /tmp/mesos-master.log 2>&1 &" >> $MESOS_SCRIPT \
  && chmod a+x $MESOS_SCRIPT
 
 # Setting for supervisor
