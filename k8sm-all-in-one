@@ -1,0 +1,160 @@
+#
+# Dockerfile - All in One
+#
+# - Build
+# docker build --rm -t k8sm:all -f 04_all-in-one .
+#
+# - Run
+# docker run -d --name="k8sm" -h "k8sm" --privileged=true -v /dev:/dev k8sm:all
+#
+# - SSH
+# ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' k8sm`
+
+# Use the base images
+FROM ubuntu:14.04
+MAINTAINER Yongbok Kim <ruo91@yongbok.net>
+
+# Change the repository
+RUN sed -i 's/archive.ubuntu.com/kr.archive.ubuntu.com/g' /etc/apt/sources.list
+
+# The last update and install package for docker
+RUN apt-get update && apt-get install -y apt-transport-https ca-certificates lxc iptables apparmor \
+ supervisor openssh-server curl nano git-core tmux build-essential
+
+# The last update and install package for mesos
+RUN apt-get update && apt-get install -y add-apt-key \
+ && apt-key adv --keyserver keyserver.ubuntu.com --recv E56151BF \
+ && echo "deb http://repos.mesosphere.io/ubuntu trusty main" > /etc/apt/sources.list.d/mesosphere.list \
+ && apt-get update && apt-get install -y mesos openssh-server supervisor nano tmux
+
+# Docker in Docker
+RUN curl -sSL https://get.docker.com/ubuntu/ | sh
+ADD conf/wrapdocker /usr/local/bin/wrapdocker
+
+# Docker config
+ENV DOCKER_CONF=/etc/default/docker
+RUN chmod +x /usr/local/bin/wrapdocker \
+ && sed -i '/^\#DOCKER_OPTS/ s:.*:DOCKER_OPTS=\"--dns 8.8.8.8 --dns 8.8.4.4 --dns-search google-public-dns-a.google.com\":' $DOCKER_CONF
+
+# Volume mount
+# Issue     : There are no more loopback devices available.
+# Solution : docker run -v /dev/:/dev
+VOLUME /dev
+VOLUME /var/run
+#VOLUME /var/lib/docker
+
+# Variable
+ENV SRC_DIR /opt
+WORKDIR $SRC_DIR
+
+# GO Language
+ENV GO_ARCH linux-amd64
+ENV GOROOT $SRC_DIR/go
+ENV PATH $PATH:$GOROOT/bin
+RUN curl -XGET https://github.com/golang/go/tags | grep tag-name > /tmp/golang_tag \
+ && sed -e 's/<[^>]*>//g' /tmp/golang_tag > /tmp/golang_ver \
+ && GO_VER=`sed -e 's/      go/go/g' /tmp/golang_ver | head -n 1` && rm -f /tmp/golang_* \
+ && curl -LO "https://storage.googleapis.com/golang/$GO_VER.$GO_ARCH.tar.gz" \
+ && tar -C $SRC_DIR -xzf go*.tar.gz && rm -rf go*.tar.gz \
+ && echo '' >> /etc/profile \
+ && echo '# Golang' >> /etc/profile \
+ && echo "export GOROOT=$GOROOT" >> /etc/profile \
+ && echo 'export PATH=$PATH:$GOROOT/bin' >> /etc/profile \
+ && echo '' >> /etc/profile
+
+# etcd
+ENV ETCD_VER release-2.0
+ENV ETCD $SRC_DIR/etcd
+ENV PATH $PATH:$ETCD
+RUN git clone https://github.com/coreos/etcd $SRC_DIR/etcd-source \
+ && cd $SRC_DIR/etcd-source \
+ && git checkout -b ETCD_VER origin/$ETCD_VER \
+ && ./build && mv bin $ETCD \
+ && cd $SRC_DIR && rm -rf $SRC_DIR/etcd-source \
+ && echo '# etcd' >> /etc/profile \
+ && echo "export ETCD=$ETCD" >> /etc/profile \
+ && echo 'export PATH=$PATH:$ETCD' >> /etc/profile \
+ && echo '' >> /etc/profile
+
+# etcd cluster scripts
+ADD conf/local/00_etcd-cluster.sh	$SRC_DIR/etcd-cluster.sh
+RUN chmod a+x $SRC_DIR/etcd-cluster.sh
+
+# Mesos Master
+ENV ZK_PORT 2181
+ENV ZK_QUORUM_NUM 1
+ENV ZK_SERVER 127.0.0.1
+ENV ZK_ZNODE_PATH mesos
+ENV CLUSTER_NAME mesos-cluster
+ENV MESOS_WORK_DIR /var/lib/mesos
+ENV MESOS_SCRIPT /etc/mesos/mesos-master.sh
+
+RUN echo "#!/bin/bash" >> $MESOS_SCRIPT \
+ && echo "mesos-master \\" >>  $MESOS_SCRIPT \
+ && echo "--cluster=$CLUSTER_NAME \\" >>  $MESOS_SCRIPT \
+ && echo "--quorum=$ZK_QUORUM_NUM \\" >>  $MESOS_SCRIPT \
+ && echo "--work_dir=$MESOS_WORK_DIR \\" >>  $MESOS_SCRIPT \
+ && echo "--zk=zk://$ZK_SERVER:$ZK_PORT/$ZK_ZNODE_PATH" >> $MESOS_SCRIPT \
+ && echo "> /tmp/etcd-cluster.log 2>&1 &" >> $MESOS_SCRIPT \
+ && chmod a+x $MESOS_SCRIPT
+
+# kubernetes-mesos
+ENV K8SM /opt/k8sm
+ENV PATH $PATH:$K8SM
+RUN git clone https://github.com/mesosphere/kubernetes-mesos.git k8sm-source \
+ && cd k8sm-source && make && make install DESTDIR=$K8SM \
+ && cd .. && rm -rf k8sm-source \
+ && echo '# kubernetes-mesos' >> /etc/profile \
+ && echo "export K8SM=$K8SM" >> /etc/profile \
+ && echo 'export PATH=$PATH:$K8SM' >> /etc/profile \
+ && echo '' >> /etc/profile
+
+# kubernetes-mesos scripts
+ADD conf/local/01_api-server.sh	$SRC_DIR/api-server.sh
+ADD conf/local/02_scheduler.sh	$SRC_DIR/scheduler.sh
+ADD conf/local/03_controller-manager.sh	$SRC_DIR/controller-manager.sh
+ADD conf/local/04_mesos-clould.conf	$SRC_DIR/mesos-clould.conf
+RUN chmod a+x $SRC_DIR/*.sh
+
+# slave scripts
+ENV CONTAINERIZERS docker,mesos
+ENV MESOS_SLAVE_SCRIPT /etc/mesos/mesos-slave.sh
+RUN echo "#!/bin/bash" > $MESOS_SLAVE_SCRIPT \
+ && echo "mesos-slave \\" >> $MESOS_SLAVE_SCRIPT \
+ && echo "--containerizers=$CONTAINERIZERS \\" >> $MESOS_SLAVE_SCRIPT \
+ && echo "--master=zk://$ZK_SERVER:$ZK_PORT/$ZK_ZNODE_PATH" >> $MESOS_SLAVE_SCRIPT \
+ && echo "> /tmp/mesos-slave.log 2>&1 &" >> $MESOS_SLAVE_SCRIPT \
+ && chmod a+x $MESOS_SLAVE_SCRIPT
+
+# kubernetes-mesos
+ENV K8SM /opt/k8sm
+ENV PATH $PATH:$K8SM
+RUN git clone https://github.com/mesosphere/kubernetes-mesos.git k8sm-source \
+ && cd k8sm-source && make && make install DESTDIR=$K8SM \
+ && cd .. && rm -rf k8sm-source \
+ && echo '# kubernetes-mesos' >> /etc/profile \
+ && echo "export K8SM=$K8SM" >> /etc/profile \
+ && echo 'export PATH=$PATH:$K8SM' >> /etc/profile \
+ && echo '' >> /etc/profile
+
+ADD conf/scripts/04_mesos-clould.conf	$SRC_DIR/mesos-clould.conf
+RUN chmod a+x $SRC_DIR/*.sh
+
+# Supervisor
+RUN mkdir -p /var/log/supervisor
+ADD conf/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# SSH
+RUN mkdir /var/run/sshd
+RUN sed -i 's/without-password/yes/g' /etc/ssh/sshd_config
+RUN sed -i 's/UsePAM yes/UsePAM no/g' /etc/ssh/sshd_config
+RUN sed -i 's/\#AuthorizedKeysFile/AuthorizedKeysFile/g' /etc/ssh/sshd_config
+
+# Set the root password for ssh
+RUN echo 'root:k8sm' |chpasswd
+
+# Port
+EXPOSE 22
+
+# Daemon
+CMD ["/usr/bin/supervisord"]

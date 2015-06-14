@@ -1,0 +1,89 @@
+#
+# Dockerfile - Apache Mesos Framework (kubernetes-mesos)
+#
+# - Build
+# docker build --rm -t k8sm:framework -f 03_kubernetes_mesos_framework .
+#
+# - Run
+# docker run -d --name="kubernetes-mesos" -h "kubernetes-mesos" k8sm:framework
+#
+# - SSH
+# ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' kubernetes-mesos`
+
+# Use the base images
+FROM     ubuntu:14.04
+
+# Maintainer
+MAINTAINER Yongbok Kim <ruo91@yongbok.net>
+
+# Change the repository
+RUN sed -i 's/archive.ubuntu.com/kr.archive.ubuntu.com/g' /etc/apt/sources.list
+
+# The last update and install package for mesos
+RUN apt-get update && apt-get install -y add-apt-key \
+ && apt-key adv --keyserver keyserver.ubuntu.com --recv E56151BF \
+ && echo "deb http://repos.mesosphere.io/ubuntu trusty main" > /etc/apt/sources.list.d/mesosphere.list \
+ && apt-get update && apt-get install -y mesos openssh-server supervisor nano curl git-core tmux build-essential
+
+# Variable
+ENV SRC_DIR /opt
+WORKDIR $SRC_DIR
+
+# LANG
+#RUN echo 'export LANG=C' >> /etc/profile \
+# && echo 'export LC_ALL=C' >> /etc/profile \
+# && echo '' >> /etc/profile \
+# && locale-gen en_US.UTF-8
+
+# GO Language
+ENV GO_ARCH linux-amd64
+ENV GOROOT $SRC_DIR/go
+ENV PATH $PATH:$GOROOT/bin
+RUN curl -XGET https://github.com/golang/go/tags | grep tag-name > /tmp/golang_tag \
+ && sed -e 's/<[^>]*>//g' /tmp/golang_tag > /tmp/golang_ver \
+ && GO_VER=`sed -e 's/      go/go/g' /tmp/golang_ver | head -n 1` && rm -f /tmp/golang_* \
+ && curl -LO "https://storage.googleapis.com/golang/$GO_VER.$GO_ARCH.tar.gz" \
+ && tar -C $SRC_DIR -xzf go*.tar.gz && rm -rf go*.tar.gz \
+ && echo '' >> /etc/profile \
+ && echo '# Golang' >> /etc/profile \
+ && echo "export GOROOT=$GOROOT" >> /etc/profile \
+ && echo 'export PATH=$PATH:$GOROOT/bin' >> /etc/profile \
+ && echo '' >> /etc/profile
+
+# kubernetes-mesos
+ENV K8SM /opt/k8sm
+ENV PATH $PATH:$K8SM
+ENV K8SM_URL https://github.com/mesosphere/kubernetes-mesos.git
+RUN git clone $K8SM_URL k8sm-source \
+ && cd k8sm-source && make && make install DESTDIR=$K8SM \
+ && cd .. && rm -rf k8sm-source \
+ && echo '# kubernetes-mesos' >> /etc/profile \
+ && echo "export K8SM=$K8SM" >> /etc/profile \
+ && echo 'export PATH=$PATH:$K8SM' >> /etc/profile \
+ && echo '' >> /etc/profile
+
+# kubernetes-mesos scripts
+ADD conf/cluster/01_api-server.sh	$SRC_DIR/api-server.sh
+ADD conf/cluster/02_scheduler.sh	$SRC_DIR/scheduler.sh
+ADD conf/cluster/03_controller-manager.sh	$SRC_DIR/controller-manager.sh
+ADD conf/cluster/04_mesos-clould.conf	$SRC_DIR/mesos-clould.conf
+RUN chmod a+x $SRC_DIR/*.sh
+
+# Setting for supervisor
+RUN mkdir -p /var/log/supervisor
+ADD conf/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# SSH
+RUN mkdir /var/run/sshd
+RUN sed -i 's/without-password/yes/g' /etc/ssh/sshd_config
+RUN sed -i 's/UsePAM yes/UsePAM no/g' /etc/ssh/sshd_config
+
+# Set the root password for ssh
+RUN echo 'root:k8sm' |chpasswd
+
+# Ports
+# SSH: 22, kubernetes-mesos WEB UI: 8080
+EXPOSE 22 8080
+
+# Supervisor
+CMD ["/usr/bin/supervisord"]

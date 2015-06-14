@@ -1,0 +1,79 @@
+#
+# Dockerfile - Cluster of Apache Mesos master
+#
+# - Build
+# docker build --rm -t k8sm:mesos-master -f 01_cluster_of_mesos_master .
+#
+# - Run
+# docker run -d --name="mesos-master-0" -h "mesos-master-0" k8sm:mesos-master
+# docker run -d --name="mesos-master-1" -h "mesos-master-1" k8sm:mesos-master
+# docker run -d --name="mesos-master-2" -h "mesos-master-2" k8sm:mesos-master
+#
+# - SSH
+# ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' mesos-master-0`
+# ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' mesos-master-1`
+# ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' mesos-master-2`
+
+# Use the base images
+FROM     ubuntu:14.04
+
+# Maintainer
+MAINTAINER Yongbok Kim <ruo91@yongbok.net>
+
+# Change the repository
+RUN sed -i 's/archive.ubuntu.com/kr.archive.ubuntu.com/g' /etc/apt/sources.list
+
+# The last update and install package for mesos
+RUN apt-get update && apt-get install -y add-apt-key \
+ && apt-key adv --keyserver keyserver.ubuntu.com --recv E56151BF \
+ && echo "deb http://repos.mesosphere.io/ubuntu trusty main" > /etc/apt/sources.list.d/mesosphere.list \
+ && apt-get update && apt-get install -y mesos openssh-server supervisor nano tmux
+
+# ZooKeeper Quorum
+ENV ZK_LEADER_PORT 3888
+ENV ZK_FOLLOW_PORT 2888
+ENV ZK_SERVER_1 mesos-master-0
+ENV ZK_SERVER_2 mesos-master-1
+ENV ZK_SERVER_3 mesos-master-2
+ENV ZK_CFG /etc/zookeeper/conf/zoo.cfg
+
+RUN echo "zk://$ZK_SERVER_1:2181,$ZK_SERVER_2:2181,$ZK_SERVER_3:2181/mesos" > /etc/mesos/zk \
+ && sed -i '/^\#server\.1/ s:.*:server\.1\='"$ZK_SERVER_1"'\:'"$ZK_FOLLOW_PORT"'\:'"$ZK_LEADER_PORT"':' $ZK_CFG \
+ && sed -i '/^\#server\.2/ s:.*:server\.2\='"$ZK_SERVER_2"'\:'"$ZK_FOLLOW_PORT"'\:'"$ZK_LEADER_PORT"':' $ZK_CFG \
+ && sed -i '/^\#server\.3/ s:.*:server\.3\='"$ZK_SERVER_3"'\:'"$ZK_FOLLOW_PORT"'\:'"$ZK_LEADER_PORT"':' $ZK_CFG
+
+# Mesos Master
+ENV ZK_PORT 2181
+ENV ZK_QUORUM_NUM 1
+ENV ZK_ZNODE_PATH mesos
+ENV CLUSTER_NAME mesos-cluster
+ENV MESOS_WORK_DIR /var/lib/mesos
+ENV MESOS_SCRIPT /etc/mesos/mesos-master.sh
+
+RUN echo "#!/bin/bash" >> $MESOS_SCRIPT \
+ && echo "mesos-master \\" >>  $MESOS_SCRIPT \
+ && echo "--cluster=$CLUSTER_NAME \\" >>  $MESOS_SCRIPT \
+ && echo "--quorum=$ZK_QUORUM_NUM \\" >>  $MESOS_SCRIPT \
+ && echo "--work_dir=$MESOS_WORK_DIR \\" >>  $MESOS_SCRIPT \
+ && echo "--zk=zk://$ZK_SERVER_1:$ZK_PORT,$ZK_SERVER_2:$ZK_PORT,$ZK_SERVER_3:$ZK_PORT/$ZK_ZNODE_PATH \\" >> $MESOS_SCRIPT \
+ && echo "> /tmp/etcd-cluster.log 2>&1 &" >> $MESOS_SCRIPT \
+ && chmod a+x $MESOS_SCRIPT
+
+# Setting for supervisor
+RUN mkdir -p /var/log/supervisor
+ADD conf/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# SSH
+RUN mkdir /var/run/sshd
+RUN sed -i 's/without-password/yes/g' /etc/ssh/sshd_config
+RUN sed -i 's/UsePAM yes/UsePAM no/g' /etc/ssh/sshd_config
+
+# Set the root password for ssh
+RUN echo 'root:k8sm' |chpasswd
+
+# Ports
+# SSH: 22, ZooKeeper Port: 2181, ZooKeeper Follow Port: 2888, ZooKeeper Leader Port: 3888, Mesos Master Web UI: 5050
+EXPOSE 22 2181 2888 3888 5050
+
+# Supervisor
+CMD ["/usr/bin/supervisord"]
