@@ -67,6 +67,15 @@ SSH passwd: k8sm
 root@ruo91:~# ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' k8sm`
 ```
 
+scheduler가 정상적으로 등록 되어있는지 확인 합니다.
+```
+root@k8sm:~# kubectl get services
+NAME             LABELS                                    SELECTOR   IP            PORT
+k8sm-scheduler   component=scheduler,provider=k8sm         <none>     10.0.104.63   10251
+kubernetes       component=apiserver,provider=kubernetes   <none>     10.0.0.2      443
+kubernetes-ro    component=apiserver,provider=kubernetes   <none>     10.0.0.1      80
+```
+
 Container의 이름은 nginx, Label은 nginx-cluster, Docker images는 ruo91 사용자의 nginx 이미지, 실행 갯수는 10개를 실행 해봅니다.
 ```
 root@k8sm:~# kubectl run-container nginx -l name=nginx-cluster --image=ruo91/nginx --replicas=10
