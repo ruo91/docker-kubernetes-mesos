@@ -2,7 +2,7 @@
 # Dockerfile - All in One
 #
 # - Build
-# docker build --rm -t k8sm:all -f 04_all-in-one .
+# docker build --rm -t k8sm:all -f k8sm-all-in-one .
 #
 # - Run
 # docker run -d --name="k8sm" -h "k8sm" --privileged=true -v /dev:/dev k8sm:all
