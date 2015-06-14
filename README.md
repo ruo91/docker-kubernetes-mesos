@@ -42,22 +42,26 @@ K8SM framework의 컨테이너를 실행 합니다.
 root@ruo91:~# docker run -d --name="k8sm" -h "k8sm" --privileged=true -v /dev:/dev k8sm:all
 ```
 
-실행 순서는 다음과 같습니다.
+실행 순서는 다음과 같으며
 
 zookeeper -> mesos-slave -> mesos-master -> etcd -> apiserver -> scheduler -> controller-manager
+
+k8sm 컨테이너에 접속합니다.
+
+SSH passwd: k8sm
 ```
-root@ruo91:~# ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' k8sm` \
-"service zookeeper start \
-&& sleep 3 && /etc/mesos/mesos-slave.sh \
-&& sleep 3 && /etc/mesos/mesos-master.sh \
-&& sleep 3 && /opt/etcd-cluster.sh"
+root@ruo91:~# ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' k8sm`
 ```
 ```
-root@ruo91:~# ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' k8sm` \
-"/opt/api-server.sh \
-&& sleep 3 && /opt/scheduler.sh \
-&& sleep 3 && /opt/controller-manager.sh"
+root@k8sm:~# service zookeeper start
+root@k8sm:~# /etc/mesos/mesos-slave.sh
+root@k8sm:~# /etc/mesos/mesos-master.sh
+root@k8sm:~# /opt/etcd-cluster.sh
+root@k8sm:~# /opt/api-server.sh
+root@k8sm:~# /opt/scheduler.sh
+root@k8sm:~# /opt/controller-manager.sh
 ```
+
 # - Test
 --------
 이제 테스트를 위해 k8sm 컨테이너에 접속합니다.
