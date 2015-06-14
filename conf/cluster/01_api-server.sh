@@ -2,8 +2,8 @@
 K8SM=/opt/k8sm
 PATH=$PATH:$K8SM
 
-ETCD_SERVER="http://localhost:4001"
-PORTAL_NET="10.0.42.1/16"
+ETCD_SERVER="http://etcd-0:4001,http://etcd-1:4001,http://etcd-2:4001"
+PORTAL_NET="`ip a s docker0 | grep 'inet' | awk '{ print $2 }'`"
 
 km apiserver \
 --v=2 \
