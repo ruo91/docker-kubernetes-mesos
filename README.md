@@ -92,7 +92,7 @@ nginx        nginx          ruo91/nginx   name=nginx-cluster   10
 이제 Pods의 정보를 확인 해보면 아직까지는 Pending으로 되어 있습니다.
 이는 Docker HUB 저장소에서 ruo91/nginx 이미지를 받아오는 중이라 생각 하면 됩니다.
 ```
-root@k8sm:~# kubectl get pods -s 172.17.1.87:8080
+root@k8sm:~# kubectl get pods
 POD           IP        CONTAINER(S)   IMAGE(S)      HOST                   LABELS            STATUS    CREATED
 nginx-7izkd             nginx          ruo91/nginx   k8sm/   name=nginx-cluster   Pending   20 seconds
 nginx-c7ies             nginx          ruo91/nginx   k8sm/   name=nginx-cluster   Pending   20 seconds
