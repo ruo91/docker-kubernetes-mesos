@@ -53,9 +53,11 @@ RUN curl -XGET https://github.com/golang/go/tags | grep tag-name > /tmp/golang_t
 # kubernetes-mesos
 ENV K8SM /opt/k8sm
 ENV PATH $PATH:$K8SM
+ENV K8SM_VER release-0.5
 ENV K8SM_URL https://github.com/mesosphere/kubernetes-mesos.git
 RUN git clone $K8SM_URL k8sm-source \
- && cd k8sm-source && make && make install DESTDIR=$K8SM \
+ && cd k8sm-source && git checkout -b $K8SM_VER origin/$K8SM_VER \  
+ && make && make install DESTDIR=$K8SM \
  && cd .. && rm -rf k8sm-source \
  && echo '# kubernetes-mesos' >> /etc/profile \
  && echo "export K8SM=$K8SM" >> /etc/profile \
