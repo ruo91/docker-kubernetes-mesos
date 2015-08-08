@@ -18,7 +18,7 @@ https://www.yongbok.net/blog/google-kubernetes-container-cluster-manager/
 
 #### - Clone
 Github 저장소에서 Dockerfile을 받아 옵니다.
-```
+```sh
 root@ruo91:~# git clone https://github.com/ruo91/docker-kubernetes-mesos /opt/docker-kubernetes-mesos
 ```
 
@@ -27,8 +27,16 @@ Kubernetes v1.0 버전이 release 되면서 K8SM가 kubernetes 저장소의 cont
 Kubernetes 0.x 버전대에서는 분산 환경에서 연동 부분에서 문제가 있었는데, v1.0+ 부터는 해결 되었으나, pods pull까지만 구현 되어있습니다.
 이 부분은 차후 해결 될것으로 보입니다.
 
-이 문서는 테스트 전용이므로 빌드와 실행이 쉽도록 쉘 스크립트를 따로 만들어 두었습니다.
-사용 방법은 아래와 같습니다.
+Kubernetes 저장소에서 받아와 빌드 합니다.
+(KUBERNETES_CONTRIB 변수를 설정 하지 않으면 빌드시에 km 명령어가 빌드 되지 않습니다.)
+```sh
+root@ruo91:~# git clone https://github.com/GoogleCloudPlatform/kubernetes /opt/kubernetes
+root@ruo91:~# cd /opt/kubernetes
+root@ruo91:~# export KUBERNETES_CONTRIB=mesos
+root@ruo91:~# make release
+```
+빌드가 완료 되면 테스트로 사용 될 Docker Images를 빌드 해야 합니다.
+이를 위해 빌드와 실행이 쉽도록 쉘 스크립트를 따로 만들어 두었습니다. 사용 방법은 아래와 같습니다.
 ```sh
 root@ruo91:~# cd /opt/docker-kubernetes-mesos
 root@ruo91:~# docker-k8sm.sh -h
