@@ -1,0 +1,64 @@
+#
+# Dockerfile - Apache Mesos Framework (kubernetes-mesos)
+#
+# - Build
+# docker build --rm -t k8sm:framework -f 02_kubernetes_mesos_framework .
+#
+# - Run
+# docker run -d --name="kubernetes-mesos" -h "kubernetes-mesos" k8sm:framework
+#
+# - SSH
+# ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' kubernetes-mesos`
+
+# Use the base images
+FROM     ubuntu:14.04
+
+# Maintainer
+MAINTAINER Yongbok Kim <ruo91@yongbok.net>
+
+# Change the repository
+RUN sed -i 's/archive.ubuntu.com/kr.archive.ubuntu.com/g' /etc/apt/sources.list
+
+# The last update and install package for mesos
+RUN apt-get update && apt-get install -y add-apt-key \
+ && apt-key adv --keyserver keyserver.ubuntu.com --recv E56151BF \
+ && echo "deb http://repos.mesosphere.io/ubuntu trusty main" > /etc/apt/sources.list.d/mesosphere.list \
+ && apt-get update && apt-get install -y mesos openssh-server supervisor nano curl git-core tmux build-essential
+
+# Variable
+ENV SRC_DIR /opt
+WORKDIR $SRC_DIR
+
+# Kubernetes Mesos
+ENV K8SM_HOME $SRC_DIR/kubernetes
+ENV PATH $PATH:$K8SM_HOME/server/bin
+ADD kubernetes-server-linux-amd64.tar.gz $SRC_DIR
+RUN echo '# Kubernetes' >> /etc/profile \
+ && echo "export K8SM_HOME=$K8SM_HOME" >> /etc/profile \
+ && echo 'export PATH=$PATH:$K8SM_HOME/server/bin' >> /etc/profile \
+ && echo '' >> /etc/profile
+
+# kubernetes-mesos scripts
+ADD conf/cluster/02_k8sm.sh	/bin/k8sm.sh
+ADD conf/cluster/03_mesos-clould.conf	$SRC_DIR/mesos-clould.conf
+ADD conf/cluster/04_nginx.yaml	$SRC_DIR/nginx.yaml
+RUN chmod a+x /bin/k8sm.sh
+
+# Setting for supervisor
+RUN mkdir -p /var/log/supervisor
+ADD conf/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# SSH
+RUN mkdir /var/run/sshd
+RUN sed -i 's/without-password/yes/g' /etc/ssh/sshd_config
+RUN sed -i 's/UsePAM yes/UsePAM no/g' /etc/ssh/sshd_config
+
+# Set the root password for ssh
+RUN echo 'root:k8sm' |chpasswd
+
+# Ports
+# SSH: 22, kubernetes-mesos WEB UI: 8080
+EXPOSE 22 8080
+
+# Supervisor
+CMD ["/usr/bin/supervisord"]

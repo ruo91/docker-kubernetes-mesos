@@ -29,35 +29,9 @@ RUN apt-get update && apt-get install -y add-apt-key \
  && echo "deb http://repos.mesosphere.io/ubuntu trusty main" > /etc/apt/sources.list.d/mesosphere.list \
  && apt-get update && apt-get install -y mesos openssh-server supervisor nano tmux
 
-# ZooKeeper Quorum
-ENV ZK_LEADER_PORT 3888
-ENV ZK_FOLLOW_PORT 2888
-ENV ZK_SERVER_1 mesos-master-0
-ENV ZK_SERVER_2 mesos-master-1
-ENV ZK_SERVER_3 mesos-master-2
-ENV ZK_CFG /etc/zookeeper/conf/zoo.cfg
-
-RUN echo "zk://$ZK_SERVER_1:2181,$ZK_SERVER_2:2181,$ZK_SERVER_3:2181/mesos" > /etc/mesos/zk \
- && sed -i '/^\#server\.1/ s:.*:server\.1\='"$ZK_SERVER_1"'\:'"$ZK_FOLLOW_PORT"'\:'"$ZK_LEADER_PORT"':' $ZK_CFG \
- && sed -i '/^\#server\.2/ s:.*:server\.2\='"$ZK_SERVER_2"'\:'"$ZK_FOLLOW_PORT"'\:'"$ZK_LEADER_PORT"':' $ZK_CFG \
- && sed -i '/^\#server\.3/ s:.*:server\.3\='"$ZK_SERVER_3"'\:'"$ZK_FOLLOW_PORT"'\:'"$ZK_LEADER_PORT"':' $ZK_CFG
-
-# Mesos Master
-ENV ZK_PORT 2181
-ENV ZK_QUORUM_NUM 1
-ENV ZK_ZNODE_PATH mesos
-ENV CLUSTER_NAME mesos-cluster
-ENV MESOS_WORK_DIR /var/lib/mesos
-ENV MESOS_SCRIPT /etc/mesos/mesos-master.sh
-
-RUN echo "#!/bin/bash" >> $MESOS_SCRIPT \
- && echo "mesos-master \\" >>  $MESOS_SCRIPT \
- && echo "--cluster=$CLUSTER_NAME \\" >>  $MESOS_SCRIPT \
- && echo "--quorum=$ZK_QUORUM_NUM \\" >>  $MESOS_SCRIPT \
- && echo "--work_dir=$MESOS_WORK_DIR \\" >>  $MESOS_SCRIPT \
- && echo "--zk=zk://$ZK_SERVER_1:$ZK_PORT,$ZK_SERVER_2:$ZK_PORT,$ZK_SERVER_3:$ZK_PORT/$ZK_ZNODE_PATH \\" >> $MESOS_SCRIPT \
- && echo "> /tmp/mesos-master.log 2>&1 &" >> $MESOS_SCRIPT \
- && chmod a+x $MESOS_SCRIPT
+# Add mesos scripts
+ADD conf/cluster/01_mesos.sh /bin/mesos.sh
+RUN chmod a+x /bin/mesos.sh
 
 # Setting for supervisor
 RUN mkdir -p /var/log/supervisor

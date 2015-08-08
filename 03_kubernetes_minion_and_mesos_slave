@@ -2,7 +2,7 @@
 # Dockerfile - Google Kubernetes minion and Apache Mesos slave
 #
 # - Build
-# docker build --rm -t k8sm:minion-slave -f 02_kubernetes_minion_and_mesos_slave .
+# docker build --rm -t k8sm:minion-slave -f 03_kubernetes_minion_and_mesos_slave .
 #
 # - Run
 # docker run -d --name="kubernetes-minion-0" -h "kubernetes-minion-0" --privileged=true -v /dev:/dev k8sm:minion-slave
@@ -53,51 +53,19 @@ RUN apt-get install -y  add-apt-key \
  && echo "deb http://repos.mesosphere.io/ubuntu trusty main" > /etc/apt/sources.list.d/mesosphere.list \
  && apt-get update && apt-get install -y mesos
 
-# slave scripts
-ENV ZK_PORT 2181
-ENV ZK_ZNODE_PATH mesos
-ENV ZK_SERVER_1 mesos-master-0
-ENV ZK_SERVER_2 mesos-master-1
-ENV ZK_SERVER_3 mesos-master-2
-ENV CONTAINERIZERS docker,mesos
-ENV MESOS_SLAVE_SCRIPT /etc/mesos/mesos-slave.sh
-
-RUN echo "#!/bin/bash" > $MESOS_SLAVE_SCRIPT \
- && echo "mesos-slave \\" >> $MESOS_SLAVE_SCRIPT \
- && echo "--containerizers=$CONTAINERIZERS \\" >> $MESOS_SLAVE_SCRIPT \
- && echo "--master=zk://$ZK_SERVER_1:$ZK_PORT,$ZK_SERVER_2:$ZK_PORT,$ZK_SERVER_3:$ZK_PORT/$ZK_ZNODE_PATH \\" >> $MESOS_SLAVE_SCRIPT \
- && echo "> /tmp/mesos-slave.log 2>&1 &" >> $MESOS_SLAVE_SCRIPT \
- && chmod a+x $MESOS_SLAVE_SCRIPT
-
-# GO Language
-ENV GO_ARCH linux-amd64
-ENV GOROOT $SRC_DIR/go
-ENV PATH $PATH:$GOROOT/bin
-RUN curl -XGET https://github.com/golang/go/tags | grep tag-name > /tmp/golang_tag \
- && sed -e 's/<[^>]*>//g' /tmp/golang_tag > /tmp/golang_ver \
- && GO_VER=`sed -e 's/      go/go/g' /tmp/golang_ver | head -n 1` && rm -f /tmp/golang_* \
- && curl -LO "https://storage.googleapis.com/golang/$GO_VER.$GO_ARCH.tar.gz" \
- && tar -C $SRC_DIR -xzf go*.tar.gz && rm -rf go*.tar.gz \
- && echo '' >> /etc/profile \
- && echo '# Golang' >> /etc/profile \
- && echo "export GOROOT=$GOROOT" >> /etc/profile \
- && echo 'export PATH=$PATH:$GOROOT/bin' >> /etc/profile \
+# Kubernetes Mesos
+ENV K8SM_HOME $SRC_DIR/kubernetes
+ENV PATH $PATH:$K8SM_HOME/server/bin
+ADD kubernetes-server-linux-amd64.tar.gz $SRC_DIR
+RUN echo '# Kubernetes' >> /etc/profile \
+ && echo "export K8SM_HOME=$K8SM_HOME" >> /etc/profile \
+ && echo 'export PATH=$PATH:$K8SM_HOME/server/bin' >> /etc/profile \
  && echo '' >> /etc/profile
 
-# kubernetes-mesos
-ENV K8SM /opt/k8sm
-ENV PATH $PATH:$K8SM
-ENV K8SM_URL https://github.com/mesosphere/kubernetes-mesos.git
-RUN git clone $K8SM_URL k8sm-source \
- && cd k8sm-source && make && make install DESTDIR=$K8SM \
- && cd .. && rm -rf k8sm-source \
- && echo '# kubernetes-mesos' >> /etc/profile \
- && echo "export K8SM=$K8SM" >> /etc/profile \
- && echo 'export PATH=$PATH:$K8SM' >> /etc/profile \
- && echo '' >> /etc/profile
-
-ADD conf/cluster/04_mesos-clould.conf	$SRC_DIR/mesos-clould.conf
-RUN chmod a+x $SRC_DIR/*.sh
+# Add mesos scripts
+ADD conf/cluster/01_mesos.sh /bin/mesos.sh
+ADD conf/cluster/03_mesos-clould.conf	$SRC_DIR/mesos-clould.conf
+RUN chmod a+x /bin/mesos.sh
 
 # Supervisor
 RUN mkdir -p /var/log/supervisor
