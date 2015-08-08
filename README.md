@@ -51,7 +51,7 @@ root@ruo91:~# docker-k8sm.sh build
 #### - Run
 etcd, mesos master, kubernetes mesos, kubernetes minion을 실행 합니다.
 ```sh
-root@ruo91:~# docker-k8sm.sh build
+root@ruo91:~# docker-k8sm.sh run
 ```
 
 실행과 동시에 각각의 Container들은 pipework를 통해 아래와 같이 구성 됩니다.
