@@ -5,60 +5,84 @@
 # docker build --rm -t k8sm:framework -f 02_kubernetes_mesos_framework .
 #
 # - Run
-# docker run -d --name="kubernetes-mesos" -h "kubernetes-mesos" k8sm:framework
+# docker run -d --name="kubernetes-mesos" -h "kubernetes-mesos" --privileged=true -v /dev:/dev k8sm:framework
 #
 # - SSH
 # ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' kubernetes-mesos`
 
 # Use the base images
-FROM     ubuntu:14.04
-
-# Maintainer
+FROM ubuntu:15.04
 MAINTAINER Yongbok Kim <ruo91@yongbok.net>
 
 # Change the repository
-RUN sed -i 's/archive.ubuntu.com/kr.archive.ubuntu.com/g' /etc/apt/sources.list
+#RUN sed -i 's/archive.ubuntu.com/kr.archive.ubuntu.com/g' /etc/apt/sources.list
 
 # The last update and install package for mesos
 RUN apt-get update && apt-get install -y add-apt-key \
  && apt-key adv --keyserver keyserver.ubuntu.com --recv E56151BF \
- && echo "deb http://repos.mesosphere.io/ubuntu trusty main" > /etc/apt/sources.list.d/mesosphere.list \
- && apt-get update && apt-get install -y mesos openssh-server supervisor nano curl git-core tmux build-essential
+ && echo "deb http://repos.mesosphere.io/ubuntu vivid main" > /etc/apt/sources.list.d/mesosphere.list \
+ && apt-get update && apt-get install -y mesos openssh-server supervisor openssh-server nano curl git-core build-essential net-tools iputils-ping bridge-utils
 
 # Variable
 ENV SRC_DIR /opt
 WORKDIR $SRC_DIR
 
-# Kubernetes Mesos
-ENV K8SM_HOME $SRC_DIR/kubernetes
-ENV PATH $PATH:$K8SM_HOME/server/bin
-ADD kubernetes-server-linux-amd64.tar.gz $SRC_DIR
-RUN echo '# Kubernetes' >> /etc/profile \
- && echo "export K8SM_HOME=$K8SM_HOME" >> /etc/profile \
- && echo 'export PATH=$PATH:$K8SM_HOME/server/bin' >> /etc/profile \
+# GO Language
+ENV GO_ARCH linux-amd64
+ENV GOROOT $SRC_DIR/go
+ENV PATH $PATH:$GOROOT/bin
+RUN curl -XGET https://github.com/golang/go/tags | grep tag-name > /tmp/golang_tag \
+ && sed -e 's/<[^>]*>//g' /tmp/golang_tag > /tmp/golang_ver \
+ && GO_VER=`sed -e 's/      go/go/g' /tmp/golang_ver | head -n 1` && rm -f /tmp/golang_* \
+ && curl -LO "https://storage.googleapis.com/golang/$GO_VER.$GO_ARCH.tar.gz" \
+ && tar -C $SRC_DIR -xzf go*.tar.gz && rm -rf go*.tar.gz \
+ && echo '' >> /etc/profile \
+ && echo '# Golang' >> /etc/profile \
+ && echo "export GOROOT=$GOROOT" >> /etc/profile \
+ && echo 'export PATH=$PATH:$GOROOT/bin' >> /etc/profile \
  && echo '' >> /etc/profile
 
-# kubernetes-mesos scripts
-ADD conf/cluster/02_k8sm.sh	/bin/k8sm.sh
-ADD conf/cluster/03_mesos-clould.conf	$SRC_DIR/mesos-clould.conf
-ADD conf/cluster/04_nginx.yaml	$SRC_DIR/nginx.yaml
-RUN chmod a+x /bin/k8sm.sh
+# Flannel
+ENV FLANNEL_HOME $SRC_DIR/flannel
+ENV PATH $PATH:$FLANNEL_HOME/bin
+RUN git clone https://github.com/coreos/flannel.git \
+ && cd flannel && ./build \
+ && echo '# flannel'>>/etc/profile \
+ && echo "export FLANNEL_HOME=/opt/flannel">>/etc/profile \
+ && echo 'export PATH=$PATH:$FLANNEL_HOME/bin'>>/etc/profile \
+ && echo ''>>/etc/profile
 
-# Setting for supervisor
+# Google - Kubernetes
+ENV KUBERNETES_HOME $SRC_DIR/kubernetes
+ENV PATH $PATH:$KUBERNETES_HOME/server/bin
+ADD kubernetes-server-linux-amd64.tar.gz $SRC_DIR
+RUN echo '# Kubernetes' >> /etc/profile \
+ && echo "export KUBERNETES_HOME=$KUBERNETES_HOME" >> /etc/profile \
+ && echo 'export PATH=$PATH:$KUBERNETES_HOME/server/bin' >> /etc/profile \
+ && echo '' >> /etc/profile
+
+# Add the kubernetes & flannel scripts
+ADD conf/network/flannel.sh /bin/flannel.sh
+ADD conf/cluster/kubernetes/k8sm.sh /bin/k8sm.sh
+ADD conf/cluster/kubernetes/mesos-clould.conf $SRC_DIR/mesos-clould.conf
+ADD conf/cluster/kubernetes/k8sm_master_add_bridge.sh /bin/k8sm_master_add_bridge.sh
+RUN chmod a+x /bin/flannel.sh /bin/k8sm.sh /bin/k8sm_master_add_bridge.sh
+
+# Supervisor
 RUN mkdir -p /var/log/supervisor
-ADD conf/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+ADD conf/supervisord/00_default.conf /etc/supervisor/conf.d/supervisord.conf
 
 # SSH
 RUN mkdir /var/run/sshd
 RUN sed -i 's/without-password/yes/g' /etc/ssh/sshd_config
 RUN sed -i 's/UsePAM yes/UsePAM no/g' /etc/ssh/sshd_config
+RUN sed -i 's/\#AuthorizedKeysFile/AuthorizedKeysFile/g' /etc/ssh/sshd_config
 
 # Set the root password for ssh
 RUN echo 'root:k8sm' |chpasswd
 
-# Ports
-# SSH: 22, kubernetes-mesos WEB UI: 8080
+# Port
 EXPOSE 22 8080
 
-# Supervisor
+# Daemon
 CMD ["/usr/bin/supervisord"]

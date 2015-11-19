@@ -7,69 +7,81 @@
 # - Run
 # docker run -d --name="kubernetes-minion-0" -h "kubernetes-minion-0" --privileged=true -v /dev:/dev k8sm:minion-slave
 # docker run -d --name="kubernetes-minion-1" -h "kubernetes-minion-1" --privileged=true -v /dev:/dev k8sm:minion-slave
-# docker run -d --name="kubernetes-minion-2" -h "kubernetes-minion-2" --privileged=true -v /dev:/dev k8sm:minion-slave
-# docker run -d --name="kubernetes-minion-3" -h "kubernetes-minion-3" --privileged=true -v /dev:/dev k8sm:minion-slave
 #
 # - SSH
 # ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' kubernetes-minion-0`
 # ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' kubernetes-minion-1`
-# ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' kubernetes-minion-2`
-# ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' kubernetes-minion-3`
-#
+
 # Use the base images
-FROM ubuntu:14.04
+FROM ubuntu:15.04
 MAINTAINER Yongbok Kim <ruo91@yongbok.net>
 
-# Change the repository
-RUN sed -i 's/archive.ubuntu.com/kr.archive.ubuntu.com/g' /etc/apt/sources.list
-
-# The last update and install package for docker
-RUN apt-get update && apt-get install -y apt-transport-https ca-certificates lxc iptables apparmor \
- supervisor openssh-server curl nano git-core tmux build-essential
+# The last update and install package for docker and mesos
+RUN  apt-get update && apt-get install -y add-apt-key apt-transport-https ca-certificates \
+ && echo "deb https://apt.dockerproject.org/repo ubuntu-vivid main" > /etc/apt/sources.list.d/docker.list \
+ && echo "deb http://repos.mesosphere.io/ubuntu vivid main" > /etc/apt/sources.list.d/mesosphere.list \
+ && apt-key adv --keyserver keyserver.ubuntu.com --recv E56151BF \
+ && apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D \
+ && apt-get update && apt-get install -y docker-engine iptables apparmor mesos supervisor openssh-server nano curl git-core build-essential net-tools iputils-ping bridge-utils
 
 # Docker in Docker
-RUN curl -sSL https://get.docker.com/ubuntu/ | sh
-ADD conf/wrapdocker /usr/local/bin/wrapdocker
-
-# Docker config
-ENV DOCKER_CONF=/etc/default/docker
-RUN chmod +x /usr/local/bin/wrapdocker \
- && sed -i '/^\#DOCKER_OPTS/ s:.*:DOCKER_OPTS=\"--dns 8.8.8.8 --dns 8.8.4.4 --dns-search google-public-dns-a.google.com\":' $DOCKER_CONF
+ADD conf/docker/default_docker /etc/default/docker
+ADD https://raw.githubusercontent.com/jpetazzo/dind/master/wrapdocker /bin/wrapdocker
+RUN chmod +x /bin/wrapdocker
 
 # Volume mount
-# Issue     : There are no more loopback devices available.
+# Issue    : There are no more loopback devices available.
 # Solution : docker run -v /dev/:/dev
-VOLUME /dev
 VOLUME /var/run
-#VOLUME /var/lib/docker
+VOLUME /var/lib/docker
 
 # Variable
 ENV SRC_DIR /opt
 WORKDIR $SRC_DIR
 
-# Mesos Slave
-RUN apt-get install -y  add-apt-key \
- && apt-key adv --keyserver keyserver.ubuntu.com --recv E56151BF \
- && echo "deb http://repos.mesosphere.io/ubuntu trusty main" > /etc/apt/sources.list.d/mesosphere.list \
- && apt-get update && apt-get install -y mesos
-
-# Kubernetes Mesos
-ENV K8SM_HOME $SRC_DIR/kubernetes
-ENV PATH $PATH:$K8SM_HOME/server/bin
-ADD kubernetes-server-linux-amd64.tar.gz $SRC_DIR
-RUN echo '# Kubernetes' >> /etc/profile \
- && echo "export K8SM_HOME=$K8SM_HOME" >> /etc/profile \
- && echo 'export PATH=$PATH:$K8SM_HOME/server/bin' >> /etc/profile \
+# GO Language
+ENV GO_ARCH linux-amd64
+ENV GOROOT $SRC_DIR/go
+ENV PATH $PATH:$GOROOT/bin
+RUN curl -XGET https://github.com/golang/go/tags | grep tag-name > /tmp/golang_tag \
+ && sed -e 's/<[^>]*>//g' /tmp/golang_tag > /tmp/golang_ver \
+ && GO_VER=`sed -e 's/      go/go/g' /tmp/golang_ver | head -n 1` && rm -f /tmp/golang_* \
+ && curl -LO "https://storage.googleapis.com/golang/$GO_VER.$GO_ARCH.tar.gz" \
+ && tar -C $SRC_DIR -xzf go*.tar.gz && rm -rf go*.tar.gz \
+ && echo '' >> /etc/profile \
+ && echo '# Golang' >> /etc/profile \
+ && echo "export GOROOT=$GOROOT" >> /etc/profile \
+ && echo 'export PATH=$PATH:$GOROOT/bin' >> /etc/profile \
  && echo '' >> /etc/profile
 
-# Add mesos scripts
-ADD conf/cluster/01_mesos.sh /bin/mesos.sh
-ADD conf/cluster/03_mesos-clould.conf	$SRC_DIR/mesos-clould.conf
-RUN chmod a+x /bin/mesos.sh
+# Flannel
+ENV FLANNEL_HOME $SRC_DIR/flannel
+ENV PATH $PATH:$FLANNEL_HOME/bin
+RUN git clone https://github.com/coreos/flannel.git \
+ && cd flannel && ./build \
+ && echo '# flannel'>>/etc/profile \
+ && echo "export FLANNEL_HOME=/opt/flannel">>/etc/profile \
+ && echo 'export PATH=$PATH:$FLANNEL_HOME/bin'>>/etc/profile \
+ && echo ''>>/etc/profile
+
+# Google - Kubernetes
+ENV KUBERNETES_HOME $SRC_DIR/kubernetes
+ENV PATH $PATH:$KUBERNETES_HOME/server/bin
+ADD kubernetes-server-linux-amd64.tar.gz $SRC_DIR
+RUN echo '# Kubernetes' >> /etc/profile \
+ && echo "export KUBERNETES_HOME=$KUBERNETES_HOME" >> /etc/profile \
+ && echo 'export PATH=$PATH:$KUBERNETES_HOME/server/bin' >> /etc/profile \
+ && echo '' >> /etc/profile
+
+# kubernetes minion & flannel scripts
+ADD conf/network/flannel.sh /bin/flannel.sh
+ADD conf/cluster/mesos/mesos.sh /bin/mesos.sh
+ADD conf/cluster/kubernetes/minion_init.sh /bin/minion-init.sh
+RUN chmod a+x /bin/flannel.sh /bin/mesos.sh /bin/minion-init.sh
 
 # Supervisor
 RUN mkdir -p /var/log/supervisor
-ADD conf/minion_supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+ADD conf/supervisord/01_minion.conf /etc/supervisor/conf.d/supervisord.conf
 
 # SSH
 RUN mkdir /var/run/sshd
@@ -81,7 +93,7 @@ RUN sed -i 's/\#AuthorizedKeysFile/AuthorizedKeysFile/g' /etc/ssh/sshd_config
 RUN echo 'root:k8sm' |chpasswd
 
 # Port
-EXPOSE 22
+EXPOSE 22 8080
 
 # Daemon
 CMD ["/usr/bin/supervisord"]

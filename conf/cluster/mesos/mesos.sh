@@ -18,6 +18,9 @@ ZK_CONFIG_MYID="/etc/zookeeper/conf/myid"
 CLUSTER_NAME="mesos-cluster"
 MESOS_WORK_DIR="/var/lib/mesos"
 
+# Mesos Slave
+CONTAINERIZERS="docker"
+
 # Logs
 MESOS_SLAVE_LOGS="/tmp/mesos-slave.log"
 MESOS_MASTER_LOGS="/tmp/mesos-master.log"
@@ -190,6 +193,7 @@ function f_mesos_slave {
   # Start Mesos Slave
   echo "Start Mesos Slave..."  && sleep 1
   mesos-slave \
+  --containerizers=$CONTAINERIZERS \
   --master=zk://$ZK_SERVER_1:$ZK_PORT,$ZK_SERVER_2:$ZK_PORT,$ZK_SERVER_3:$ZK_PORT/$ZK_ZNODE_PATH \
   > $MESOS_SLAVE_LOGS 2>&1 &
   echo "done"
@@ -211,6 +215,7 @@ function f_mesos_slave_manual {
   # Start Mesos Slave
   echo "Start Mesos Slave..."  && sleep 1
   mesos-slave \
+  --containerizers=$CONTAINERIZERS \
   --master=zk://$ZK_SERVERS/$ZK_ZNODE_PATH \
   > $MESOS_SLAVE_LOGS 2>&1 &
   echo "done"

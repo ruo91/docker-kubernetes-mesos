@@ -1,28 +1,28 @@
 #
-# Dockerfile - etcd cluster
+# Dockerfile - Google Kubernetes: etcd cluster
 #
 # - Build
 # docker build --rm -t k8sm:etcd -f 00_cluster_of_etcd .
 #
 # - Run
-# docker run -d --name="etcd-0" -h "etcd-0" k8sm:etcd
-# docker run -d --name="etcd-1" -h "etcd-1" k8sm:etcd
-# docker run -d --name="etcd-2" -h "etcd-2" k8sm:etcd
+# docker run -d --name="etcd-cluster-0" -h "etcd-cluster-0" k8sm:etcd
+# docker run -d --name="etcd-cluster-1" -h "etcd-cluster-1" k8sm:etcd
+# docker run -d --name="etcd-cluster-2" -h "etcd-cluster-2" k8sm:etcd
 #
 # - SSH
-# ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' etcd-0`
-# ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' etcd-1`
-# ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' etcd-2`
+# ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' etcd-cluster-0`
+# ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' etcd-cluster-1`
+# ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' etcd-cluster-2`
 
 # Use the base images
-FROM ubuntu:14.04
+FROM ubuntu:15.04
 MAINTAINER Yongbok Kim <ruo91@yongbok.net>
 
 # Change the repository
-RUN sed -i 's/archive.ubuntu.com/kr.archive.ubuntu.com/g' /etc/apt/sources.list
+#RUN sed -i 's/archive.ubuntu.com/kr.archive.ubuntu.com/g' /etc/apt/sources.list
 
 # The last update and install package for docker
-RUN apt-get update && apt-get install -y supervisor openssh-server git-core curl nano tmux build-essential
+RUN apt-get update && apt-get install -y supervisor openssh-server git-core curl nano build-essential
 
 # Variable
 ENV SRC_DIR /opt
@@ -44,13 +44,10 @@ RUN curl -XGET https://github.com/golang/go/tags | grep tag-name > /tmp/golang_t
  && echo '' >> /etc/profile
 
 # etcd
-ENV ETCD_VER master
 ENV ETCD $SRC_DIR/etcd
 ENV PATH $PATH:$ETCD
 RUN git clone https://github.com/coreos/etcd $SRC_DIR/etcd-source \
- && cd $SRC_DIR/etcd-source \
- && git checkout -b ETCD_VER origin/$ETCD_VER \
- && ./build && mv bin $ETCD \
+ && cd $SRC_DIR/etcd-source && ./build && mv bin $ETCD \
  && cd $SRC_DIR && rm -rf $SRC_DIR/etcd-source \
  && echo '# etcd' >> /etc/profile \
  && echo "export ETCD=$ETCD" >> /etc/profile \
@@ -58,12 +55,12 @@ RUN git clone https://github.com/coreos/etcd $SRC_DIR/etcd-source \
  && echo '' >> /etc/profile
 
 # etcd cluster scripts
-ADD conf/cluster/00_etcd-cluster.sh	/bin/etcd-cluster.sh
+ADD conf/cluster/etcd/etcd-cluster.sh /bin/etcd-cluster.sh
 RUN chmod a+x /bin/etcd-cluster.sh
 
 # Supervisor
 RUN mkdir -p /var/log/supervisor
-ADD conf/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+ADD conf/supervisord/00_default.conf /etc/supervisor/conf.d/supervisord.conf
 
 # SSH
 RUN mkdir /var/run/sshd
@@ -75,7 +72,7 @@ RUN sed -i 's/\#AuthorizedKeysFile/AuthorizedKeysFile/g' /etc/ssh/sshd_config
 RUN echo 'root:k8sm' |chpasswd
 
 # Port
-EXPOSE 22 2380 4001
+EXPOSE 22 2379 2380 4001
 
 # Daemon
 CMD ["/usr/bin/supervisord"]

@@ -15,32 +15,30 @@
 # ssh `docker inspect -f '{{ .NetworkSettings.IPAddress }}' mesos-master-2`
 
 # Use the base images
-FROM     ubuntu:14.04
+FROM     ubuntu:15.04
 
 # Maintainer
 MAINTAINER Yongbok Kim <ruo91@yongbok.net>
 
-# Change the repository
-RUN sed -i 's/archive.ubuntu.com/kr.archive.ubuntu.com/g' /etc/apt/sources.list
-
 # The last update and install package for mesos
 RUN apt-get update && apt-get install -y add-apt-key \
  && apt-key adv --keyserver keyserver.ubuntu.com --recv E56151BF \
- && echo "deb http://repos.mesosphere.io/ubuntu trusty main" > /etc/apt/sources.list.d/mesosphere.list \
- && apt-get update && apt-get install -y mesos openssh-server supervisor nano tmux
+ && echo "deb http://repos.mesosphere.io/ubuntu vivid main" > /etc/apt/sources.list.d/mesosphere.list \
+ && apt-get update && apt-get install -y mesos openssh-server supervisor nano net-tools iputils-ping
 
 # Add mesos scripts
-ADD conf/cluster/01_mesos.sh /bin/mesos.sh
+ADD conf/cluster/mesos/mesos.sh /bin/mesos.sh
 RUN chmod a+x /bin/mesos.sh
 
 # Setting for supervisor
 RUN mkdir -p /var/log/supervisor
-ADD conf/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+ADD conf/supervisord/00_default.conf /etc/supervisor/conf.d/supervisord.conf
 
 # SSH
 RUN mkdir /var/run/sshd
 RUN sed -i 's/without-password/yes/g' /etc/ssh/sshd_config
 RUN sed -i 's/UsePAM yes/UsePAM no/g' /etc/ssh/sshd_config
+RUN sed -i 's/\#AuthorizedKeysFile/AuthorizedKeysFile/g' /etc/ssh/sshd_config
 
 # Set the root password for ssh
 RUN echo 'root:k8sm' |chpasswd
