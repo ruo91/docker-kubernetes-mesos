@@ -30,6 +30,12 @@ function f_build {
       docker build --rm -t k8sm:minion-slave -f 03_kubernetes_minion_and_mesos_slave .
   echo "Done."
   echo
+
+  # Kubernetes Client
+  echo "build Kubernetes Client..." && sleep 1
+      docker build --rm -t k8sm:client -f 04_kubernetes_client .
+  echo "Done"
+  echo
 }
 
 function f_run {
@@ -51,17 +57,23 @@ function f_run {
 
   # Kubernetes Mesos
   echo "Run Kubernetes Mesos..." && sleep 1
-      docker run -d --name="kubernetes-mesos" -h "kubernetes-mesos" -p 8080:8080 k8sm:framework
+      docker run -d --name="kubernetes-mesos" -h "kubernetes-mesos" -p 8080:8080 --privileged=true -v /dev:/dev -v /lib/modules:/lib/modules k8sm:framework
   echo "Done."
   echo
 
   # Kubernetes Minion & Mesos Slave
   for ((i=0; i<4; i++)); do
       echo "Run Kubernetes Minion & Mesos Slave... #$i" && sleep 1
-          docker run -d --name="kubernetes-minion-$i" -h "kubernetes-minion-$i" --privileged=true -v /dev:/dev k8sm:minion-slave
+          docker run -d --name="kubernetes-minion-$i" -h "kubernetes-minion-$i" --privileged=true -v /dev:/dev -v /lib/modules:/lib/modules k8sm:minion-slave
       echo "Done."
       echo
   done
+
+  # Kubernetes Client
+  echo "Run Kubernetes Client" && sleep 1
+      docker run -d --name="kubernetes-client" -h "kubernetes-client" k8sm:client
+  echo "Done"
+  echo
 }
 
 function f_static_ip {
@@ -126,6 +138,12 @@ function f_static_ip {
       echo "Done."
       echo
 
+      # Kubernetes Client
+      echo "Setting of Static IP - Kubernetes Client" && sleep 1
+          docker-pipework docker0 kubernetes-client 172.17.1.12/16
+      echo "Done"
+      echo
+
   else
       CURL_CHECK="$(which curl)"
       if [ -f "$CURL_CHECK" ]; then
@@ -177,7 +195,7 @@ function f_rm {
       docker stop \
         etcd-0 etcd-1 etcd-2 \
         mesos-master-0 mesos-master-1 mesos-master-2 \
-        kubernetes-mesos kubernetes-minion-0 kubernetes-minion-1 kubernetes-minion-2 kubernetes-minion-3 \
+        kubernetes-mesos kubernetes-minion-0 kubernetes-minion-1 kubernetes-minion-2 kubernetes-minion-3 kubernetes-client \
         > /dev/null
   echo "Done."
   echo
@@ -186,7 +204,7 @@ function f_rm {
       docker rm \
         etcd-0 etcd-1 etcd-2 \
         mesos-master-0 mesos-master-1 mesos-master-2 \
-        kubernetes-mesos kubernetes-minion-0 kubernetes-minion-1 kubernetes-minion-2 kubernetes-minion-3 \
+        kubernetes-mesos kubernetes-minion-0 kubernetes-minion-1 kubernetes-minion-2 kubernetes-minion-3 kubernetes-client \
         > /dev/null
   echo "Done."
   echo
