@@ -17,7 +17,7 @@ echo "done" && sleep 2
 
 # Flannel
 $FLANNEL flannel start && sleep 2
-  
+
 # Delete docker bridge
 ip link set dev docker0 down && sleep 2
 brctl delbr docker0 && sleep 2

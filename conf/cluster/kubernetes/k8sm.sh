@@ -21,7 +21,7 @@ K8SM_ETCD_SERVER="http://172.17.1.1:$K8SM_ETCD_PORT,http://172.17.1.2:$K8SM_ETCD
 # API Server
 K8SM_API_SERVER="172.17.1.7"
 K8SM_API_SERVER_PORT="8080"
-K8SM_API_SERVER_CLUSTER_IP_RANGE="10.0.0.0/16"
+K8SM_API_SERVER_CLUSTER_IP_RANGE="$(ip a s flannel.1 | grep -v 'inet6' | grep 'inet' | cut -d ':' -f 2 | awk '{ print $2}' | sed 's/0\/16/0\/24/g')"
 
 # Scheduler
 K8SM_SCHEDULER_MESOS_USER="root"
