@@ -327,7 +327,7 @@ Kubernetes Web UI - Pods
 ![Kubernetes Web UI Pods][5]
 
 Thanks. :-)
-[0]: http://cdn.yongbok.net/ruo91/architecture/k8sm/The_architecture_diagram_of_Kubernetes_Framework_for_Apache_Mesos.png
+[0]: http://cdn.yongbok.net/ruo91/architecture/k8s/kubernetes_mesos_architecture_v1.x.png
 [1]: http://cdn.yongbok.net/ruo91/architecture/k8sm/k8sm_mesos_web_ui.png
 [2]: http://cdn.yongbok.net/ruo91/architecture/k8sm/k8sm_mesos_web_ui_framework.png
 [3]: http://cdn.yongbok.net/ruo91/architecture/k8sm/k8sm_mesos_web_ui_framework_id.png
